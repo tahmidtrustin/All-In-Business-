@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All In Business - 64 District Specialty Marketplace</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet OpenStreetMap & Satellite Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandRed: '#e53935',
+                        brandRedDark: '#b71c1c',
+                        brandDark: '#121826',
+                        brandGold: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Highlight Effect Fix Requested by User */
+        .interactive-hover {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .interactive-hover:hover, .interactive-hover.active-selection {
+            background-color: #e53935 !important;
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            box-shadow: 0 4px 15px rgba(229, 57, 53, 0.4);
+            transform: translateY(-2px);
+        }
+        .interactive-hover:hover *, .interactive-hover.active-selection * {
+            color: #ffffff !important;
+        }
+
+        #map {
+            height: 520px;
+            width: 100%;
+            border-radius: 1rem;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+    <!-- Top Notice Bar -->
+    <div class="bg-brandDark text-white text-xs py-2 px-4 flex justify-between items-center border-b border-gray-800">
+        <div><i class="fa-solid fa-truck-fast text-brandRed mr-2"></i>বাংলাদেশের ৬৪ জেলার আসল উৎপাদক ও ডিলারদের সংযোগস্থল</div>
+        <div class="flex items-center space-x-4">
+            <span class="text-gray-400"><i class="fa-solid fa-location-dot text-brandRed mr-1"></i>লাইভ লোকেশন ট্র্যাকিং সক্রিয়</span>
+            <button onclick="openAuthModal('buyer')" class="text-brandGold hover:underline font-semibold">লগইন / রেজিস্ট্রেশন</button>
+        </div>
+    </div>
+
+    <!-- Main Navigation Header -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="window.location.reload()">
+                <div class="bg-brandRed text-white p-2.5 rounded-xl font-black text-2xl shadow-lg tracking-wider">AIB</div>
+                <div>
+                    <h1 class="text-2xl font-black tracking-tight text-gray-900 leading-none">All In Business</h1>
+                    <p class="text-xs text-brandRed font-bold tracking-wide">৬৪ জেলার ট্রেড ও ডিলার হাব</p>
+                </div>
+            </div>
+
+            <!-- Global Search Box -->
+            <div class="flex-1 max-w-xl mx-8 relative">
+                <div class="flex">
+                    <select id="searchDistrictSelect" onchange="filterProductsByDistrict(this.value)" class="bg-gray-100 border border-r-0 border-gray-300 text-gray-700 text-sm rounded-l-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brandRed">
+                        <option value="all">সব জেলা (৬৪)</option>
+                    </select>
+                    <input type="text" id="searchInput" oninput="searchProducts(this.value)" placeholder="পণ্য, খাবার বা জিলা সার্চ করুন (যেমন: আম, নকশী কাঁথা, দই)..." class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm py-2 px-4 focus:outline-none focus:ring-2 focus:ring-brandRed">
+                    <button class="bg-brandRed text-white px-5 rounded-r-lg font-bold hover:bg-brandRedDark transition">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- User Status / Mode Switch & Actions -->
+            <div class="flex items-center space-x-3">
+                <div class="bg-gray-100 p-1 rounded-lg border border-gray-200 flex text-xs font-bold">
+                    <button id="modeB2B" onclick="switchMarketMode('b2b')" class="px-3 py-1.5 rounded-md bg-brandRed text-white shadow">ডিলার (B2B)</button>
+                    <button id="modeB2C" onclick="switchMarketMode('b2c')" class="px-3 py-1.5 rounded-md text-gray-600 hover:text-gray-900">খুচরা (B2C)</button>
+                </div>
+
+                <button onclick="requireAction('অর্ডার / কার্ট দেখতে')" class="relative p-2.5 text-gray-700 hover:text-brandRed">
+                    <i class="fa-solid fa-cart-shopping text-xl"></i>
+                    <span id="cartCount" class="absolute -top-1 -right-1 bg-brandRed text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">0</span>
+                </button>
+
+                <button onclick="openAuthModal('buyer')" id="userProfileBtn" class="flex items-center space-x-2 bg-brandDark text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-800 transition text-sm">
+                    <i class="fa-solid fa-user-tie"></i>
+                    <span id="navUserName">প্রোফাইল / লগইন</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Category Bar with Interactive Hover -->
+        <div class="bg-gray-900 text-gray-200 border-t border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 flex items-center justify-between overflow-x-auto text-sm">
+                <div onclick="filterCategory('all')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-border-all"></i> সকল পণ্য
+                </div>
+                <div onclick="filterCategory('Agri')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-wheat-awn"></i> এগ্রিকালচার ও ফলমূল
+                </div>
+                <div onclick="filterCategory('Food')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-bowl-food"></i> বিখ্যাত খাবার ও মিষ্টি
+                </div>
+                <div onclick="filterCategory('Handicraft')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-shirt"></i> হস্তশিল্প ও তাঁত বস্ত্র
+                </div>
+                <div onclick="filterCategory('Ayurvedic')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-leaf"></i> আয়ুর্বেদিক ও ভেষজ
+                </div>
+                <div onclick="filterCategory('GI')" class="interactive-hover px-4 py-3 font-semibold text-center border-r border-gray-800 flex items-center gap-2 text-brandGold">
+                    <i class="fa-solid fa-award"></i> জিআই (GI) স্বীকৃত পণ্য
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-8">
+
+        <!-- Banner & Live Map Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Info Panel -->
+            <div class="bg-gradient-to-br from-gray-900 to-brandDark text-white p-6 rounded-2xl shadow-xl flex flex-col justify-between">
+                <div>
+                    <span class="bg-brandRed text-white text-xs font-black uppercase px-3 py-1 rounded-full">জাতীয় সরবরাহ নেটওয়ার্ক</span>
+                    <h2 class="text-3xl font-extrabold mt-4 leading-tight">বাংলাদেশের ৬৪ জেলার আসল উৎস থেকে পণ্য ক্রয় করুন</h2>
+                    <p class="text-gray-300 text-sm mt-3 leading-relaxed">
+                        শিবগঞ্জের আম, জামালপুরের নকশী কাঁথা, বগুড়ার দই থেকে শুরু করে সব জেলার অরিজিনাল ডিলার ও ম্যানুফ্যাকচারারদের সাথে সরাসরি যুক্ত হোন।
+                    </p>
+                </div>
+
+                <div class="mt-6 space-y-3 bg-gray-800/60 p-4 rounded-xl border border-gray-700">
+                    <div class="text-xs text-gray-300"><i class="fa-solid fa-crosshairs text-brandRed mr-2"></i>উৎপাদন পয়েন্ট অরিজিন ট্র্যাকিং</div>
+                    <div id="selectedOriginText" class="font-bold text-sm text-brandGold">উপজেলা/জেলা: শিবগঞ্জ, চাঁপাইনবাবগঞ্জ</div>
+                    <div class="text-xs text-gray-400">ডাইরেক্ট বাগান ও ডিলার সাপ্লাই পয়েন্ট জিপিএস লোকেশন সহ প্রদর্শিত হচ্ছে।</div>
+                </div>
+
+                <div class="mt-6 flex gap-2">
+                    <button onclick="requireAction('নতুন ডিলার রেজিস্টার করতে')" class="w-full bg-brandRed hover:bg-brandRedDark text-white py-3 rounded-xl font-bold transition shadow-lg text-sm">
+                        <i class="fa-solid fa-store mr-2"></i>ডিলার হিসেবে যুক্ত হোন
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Interactive Leaflet Satellite & Map -->
+            <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-lg border border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-brandRed text-xl"></i>
+                        <h3 class="font-bold text-gray-900">৬৪ জেলা অরিজিনাল সোর্স ম্যাপ (Satellite Live View)</h3>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleSatelliteView(false)" id="btnStreet" class="px-3 py-1 text-xs font-bold rounded bg-brandRed text-white">ম্যাপ ভিউ</button>
+                        <button onclick="toggleSatelliteView(true)" id="btnSat" class="px-3 py-1 text-xs font-bold rounded bg-gray-200 text-gray-700">স্যাটেলাইট ভিউ</button>
+                    </div>
+                </div>
+                
+                <!-- Map Container -->
+                <div id="map"></div>
+            </div>
+        </section>
+
+        <!-- District Selection Grid (64 District Selector) -->
+        <section class="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fa-solid fa-city text-brandRed"></i> বিভাগ অনুযায়ী ৬৪টি জেলা নির্বাচন করুন
+                </h3>
+                <span class="text-xs text-gray-500">যে কোনো জেলায় ক্লিক করলে বিখ্যাত পণ্যসমূহ ফিল্টার হবে</span>
+            </div>
+
+            <!-- Division Tabs -->
+            <div class="flex gap-2 overflow-x-auto pb-3 mb-4" id="divisionTabs">
+                <!-- Javascript will load division tabs -->
+            </div>
+
+            <!-- District Buttons -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2" id="districtButtonsGrid">
+                <!-- Javascript dynamic buttons -->
+            </div>
+        </section>
+
+        <!-- Active Marketplace Showcase -->
+        <section>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <h2 id="sectionTitle" class="text-2xl font-black text-gray-900">সকল জেলার জনপ্রিয় ও খাঁটি পণ্যসমূহ</h2>
+                    <p class="text-sm text-gray-600">ডাইরেক্ট সোর্স, ডিলার ও উৎপাদকের প্রোফাইল ও লোকেশন সহ</p>
+                </div>
+                <div id="productCountBadge" class="mt-2 md:mt-0 bg-brandRed/10 text-brandRed font-extrabold px-4 py-1.5 rounded-full text-sm">
+                    মোট পণ্য দেখাচ্ছে: 64 টি জেলা
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="productsGrid">
+                <!-- Javascript Rendered Product Cards -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Role Selection & Authentication Modal -->
+    <div id="authModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+            <div class="bg-brandDark text-white p-6 text-center relative">
+                <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="w-12 h-12 bg-brandRed rounded-xl flex items-center justify-center text-white text-2xl font-black mx-auto mb-2">AIB</div>
+                <h3 class="text-xl font-black">All In Business - এ প্রবেশ করুন</h3>
+                <p id="authReasonText" class="text-xs text-gray-300 mt-1">যেকোনো অ্যাকশন নেওয়ার আগে রোল নির্বাচন করে অ্যাকাউন্ট খুলুন</p>
+            </div>
+
+            <form onsubmit="handleUserRegistration(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-700 mb-1">আপনার অ্যাকাউন্ট ভূমিকা (Role)</label>
+                    <select id="userRoleSelect" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-semibold focus:ring-2 focus:ring-brandRed">
+                        <option value="Dealer">ডিলার / পাইকারী সরবরাহকারী (Bulk Dealer)</option>
+                        <option value="SmallSeller">ক্ষুদ্র বিক্রেতা / দোকানদার (Small Seller)</option>
+                        <option value="Buyer">সাধারণ ক্রেতা (Retail Buyer)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-700 mb-1">আপনার নাম / প্রতিষ্ঠানের নাম</label>
+                    <input type="text" id="userNameInput" required placeholder="যেমন: আব্দুর রহমান / রহমান ট্রেডার্স" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-700 mb-1">মোবাইল নম্বর</label>
+                    <input type="tel" id="userPhoneInput" required placeholder="017XXXXXXXX" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-700 mb-1">আপনার জেলা ও উপজেলা (Location)</label>
+                    <input type="text" id="userLocInput" required placeholder="যেমন: শিবগঞ্জ, চাঁপাইনবাবগঞ্জ" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                </div>
+
+                <button type="submit" class="w-full bg-brandRed hover:bg-brandRedDark text-white py-3 rounded-xl font-bold transition shadow-lg mt-2">
+                    রেজিস্ট্রেশন ও প্রোফাইল তৈরি সম্পন্ন করুন
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Product Details & GPS Tracking Modal -->
+    <div id="productDetailModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div id="productDetailContent">
+                <!-- Dynamic Content via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footbar -->
+    <footer class="bg-brandDark text-gray-400 py-10 mt-16 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
+            <div>
+                <h4 class="text-white font-bold text-lg mb-3">All In Business</h4>
+                <p class="text-xs leading-relaxed">বাংলাদেশের ৬৪টি জেলার বিখ্যাত আঞ্চলিক ঐতিহ্য ও ডিলার নেটওয়ার্ককে এক প্ল্যাটফর্মে যুক্ত করার ডিজিটাল ইকোসিস্টেম।</p>
+            </div>
+            <div>
+                <h5 class="text-white font-semibold mb-3">প্রধান বিভাগসমূহ</h5>
+                <ul class="space-y-1.5 text-xs">
+                    <li>রাজশাহী ও চাপাইনবাবগঞ্জের আম</li>
+                    <li>জামালপুরের নকশী কাঁথা ও মিল্লি</li>
+                    <li>বগুড়ার দই ও তাঁত শিল্প</li>
+                    <li>কুমিল্লার রসমালাই ও খদ্দর</li>
+                </ul>
+            </div>
+            <div>
+                <h5 class="text-white font-semibold mb-3">ব্যবসা ব্যবস্থা</h5>
+                <ul class="space-y-1.5 text-xs">
+                    <li>অরিজিনাল ডিলার ভেরিফিকেশন</li>
+                    <li>লাইভ জিপিএস রুট ম্যাপিং</li>
+                    <li>বাল্ক বি টু বি (B2B) কোটেশন</li>
+                    <li>জিআই (GI) পণ্য সার্টিফিকেট</li>
+                </ul>
+            </div>
+            <div>
+                <h5 class="text-white font-semibold mb-3">যোগাযোগ ও সহায়তা</h5>
+                <p class="text-xs">হটলাইন: ১৬৬০১ (২৪/৭)</p>
+                <p class="text-xs mt-1">ইমেইল: support@allinbusiness.com.bd</p>
+                <p class="text-xs mt-1">হেড অফিস: মতিঝিল বা/এ, ঢাকা, বাংলাদেশ</p>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 mt-8 pt-4 border-t border-gray-800 text-center text-xs text-gray-500">
+            &copy; 2026 All In Business (AIB). সর্বস্বত্ব সংরক্ষিত।
+        </div>
+    </footer>
+
+    <!-- JavaScript Data & Logic Application Engine -->
+    <script>
+        // Database of Bangladesh 64 Districts with Genuine Specialities
+        const DISTRICTS_DATA = [
+            // Rajshahi Division
+            { id: "chapainawabganj", name: "চাঁপাইনবাবগঞ্জ", division: "Rajshahi", lat: 24.5965, lng: 88.2775, famous: "খিরসাপাত ও ল্যাংড়া আম, কলাইয়ের রুটি, শিবগঞ্জের চমচম", category: "Agri", gi: true },
+            { id: "rajshahi", name: "রাজশাহী", division: "Rajshahi", lat: 24.3745, lng: 88.6042, famous: "রাজশাহী সিল্ক, মিষ্টি পান, ফজলি আম", category: "Handicraft", gi: true },
+            { id: "bogra", name: "বগুড়া", division: "Rajshahi", lat: 24.8481, lng: 89.3730, famous: "বগুড়ার দই, লাল মরিচ, কটকটি", category: "Food", gi: true },
+            { id: "natore", name: "নাটোর", division: "Rajshahi", lat: 24.4102, lng: 88.9876, famous: "নাটোরের কাঁচাগোল্লা, প্রাণহরা", category: "Food", gi: true },
+            { id: "naogaon", name: "নওগাঁ", division: "Rajshahi", lat: 24.7936, lng: 88.9318, famous: "প্যারা সন্দেশ, জিরেশাইল চাল", category: "Food", gi: false },
+            { id: "pabna", name: "পাবনা", division: "Rajshahi", lat: 24.0063, lng: 89.2493, famous: "প্যারাডাইসের প্যারা সন্দেশ, খাঁটি ঘি, তাঁতের শাড়ি", category: "Food", gi: false },
+            { id: "sirajganj", name: "সিরাজগঞ্জ", division: "Rajshahi", lat: 24.4534, lng: 89.7008, famous: "তাঁতের শাড়ি, পানিতোয়া মিষ্টি, ধানসিঁড়ির দই", category: "Handicraft", gi: false },
+            { id: "joypurhat", name: "জয়পুরহাট", division: "Rajshahi", lat: 25.1013, lng: 89.0268, famous: "লতিরাজ কচু, লতি, জিলিপি", category: "Agri", gi: false },
+
+            // Mymensingh Division
+            { id: "jamalpur", name: "জামালপুর", division: "Mymensingh", lat: 24.9375, lng: 89.9377, famous: "নকশী কাঁথা, মেলান্দহের মিল্লি ভাত, ছানার পোলাও", category: "Handicraft", gi: true },
+            { id: "mymensingh", name: "ময়মনসিংহ", division: "Mymensingh", lat: 24.7471, lng: 90.4203, famous: "মুক্তাগাছার মন্ডা, আমৃতি", category: "Food", gi: true },
+            { id: "sherpur", name: "শেরপুর", division: "Mymensingh", lat: 25.0204, lng: 90.0153, famous: "তুলসীমালা চাল, ছানার পায়েস", category: "Agri", gi: true },
+            { id: "netrokona", name: "নেত্রকোণা", division: "Mymensingh", lat: 24.8709, lng: 90.7279, famous: "বালিশ মিষ্টি, সাদা মাটি (বিজয়পুর)", category: "Food", gi: true },
+
+            // Dhaka Division
+            { id: "dhaka", name: "ঢাকা", division: "Dhaka", lat: 23.8103, lng: 90.4125, famous: "পুরান ঢাকার বাকরখানি, হাজীর বিরিয়ানি, মসলিন", category: "Food", gi: true },
+            { id: "tangail", name: "টাঙ্গাইল", division: "Dhaka", lat: 24.2513, lng: 89.9167, famous: "পোড়াবাড়ীর চমচম, তাঁতের শাড়ি", category: "Food", gi: true },
+            { id: "narayanganj", name: "নারায়ণগঞ্জ", division: "Dhaka", lat: 23.6238, lng: 90.5000, famous: "জামদানী শাড়ি, রপ্তানিমুখী পোশাক", category: "Handicraft", gi: true },
+            { id: "narsingdi", name: "নরসিংদী", division: "Dhaka", lat: 23.9193, lng: 90.7201, famous: "সাগর কলা, লটকন ফল", category: "Agri", gi: false },
+            { id: "gazipur", name: "গাজীপুর", division: "Dhaka", lat: 23.9999, lng: 90.4203, famous: "কাঁঠাল, পেয়ারা", category: "Agri", gi: false },
+            { id: "faridpur", name: "ফরিদপুর", division: "Dhaka", lat: 23.6070, lng: 89.8429, famous: "খেজুরের খাঁটি পাটালি গুড়, কুমারখালীর তাঁত", category: "Food", gi: false },
+            { id: "gopalganj", name: "গোপালগঞ্জ", division: "Dhaka", lat: 23.0050, lng: 89.8266, famous: "রসগোল্লা, পাট সামগ্রী", category: "Food", gi: false },
+            { id: "madaripur", name: "মাদারীপুর", division: "Dhaka", lat: 23.1641, lng: 90.1897, famous: "রসগোল্লা, খেজুর গুড়", category: "Food", gi: false },
+            { id: "manikganj", name: "মানিকগঞ্জ", division: "Dhaka", lat: 23.8644, lng: 90.0047, famous: "হাজারী গুড়, খেজুর রস", category: "Food", gi: false },
+            { id: "munshiganj", name: "মুন্সীগঞ্জ", division: "Dhaka", lat: 23.5422, lng: 90.5305, famous: "ভাগ্যকুলের মিষ্টি, আলু", category: "Food", gi: false },
+            { id: "rajbari", name: "রাজবাড়ী", division: "Dhaka", lat: 23.7574, lng: 89.6444, famous: "চমচম, খেজুর গুড়", category: "Food", gi: false },
+            { id: "shariatpur", name: "শরীয়তপুর", division: "Dhaka", lat: 23.2423, lng: 90.4348, famous: "নলগুড়, পটলের পিঠা", category: "Food", gi: false },
+            { id: "kishoreganj", name: "কিশোরগঞ্জ", division: "Dhaka", lat: 24.4449, lng: 90.7765, famous: "অষ্টগ্রামের পনির, নকশি পিঠা", category: "Food", gi: false },
+
+            // Chittagong Division
+            { id: "chittagong", name: "চট্টগ্রাম", division: "Chittagong", lat: 22.3569, lng: 91.7832, famous: "মেজবানি গরুর মাংস, শুঁটকি মাছ, বাঁশখালী চা", category: "Food", gi: false },
+            { id: "comilla", name: "কুমিল্লা", division: "Chittagong", lat: 23.4607, lng: 91.1809, famous: "কুমিল্লার রসমালাই, খদ্দর (খাদী) কাপাড়", category: "Food", gi: true },
+            { id: "coxsbazar", name: "কক্সবাজার", division: "Chittagong", lat: 21.4272, lng: 92.0058, famous: "মিষ্টি পান, শুঁটকি মাছ, সামুদ্রিক মাছ", category: "Food", gi: false },
+            { id: "chandpur", name: "চাঁদপুর", division: "Chittagong", lat: 23.2321, lng: 90.6631, famous: "পদ্মার রূপালী ইলিশ মাছ", category: "Food", gi: true },
+            { id: "brahmanbaria", name: "ব্রাহ্মণবাড়িয়া", division: "Chittagong", lat: 23.9571, lng: 91.1119, famous: "ছানামুখী মিষ্টি, তালের বড়া", category: "Food", gi: true },
+            { id: "feni", name: "ফেনী", division: "Chittagong", lat: 23.0159, lng: 91.3976, famous: "মহিষের দুধের খাঁটি ঘি, খন্ডলের মিষ্টি", category: "Food", gi: false },
+            { id: "noakhali", name: "নোয়াখালী", division: "Chittagong", lat: 22.8695, lng: 91.0993, famous: "নারকেল নাড়ু, ম্যাড়া পিঠা, দই", category: "Food", gi: false },
+            { id: "lakshmipur", name: "লক্ষ্মীপুর", division: "Chittagong", lat: 22.9426, lng: 90.8411, famous: "সুপারি, নারকেল", category: "Agri", gi: false },
+            { id: "khagrachhari", name: "খাগড়াছড়ি", division: "Chittagong", lat: 23.1193, lng: 91.9847, famous: "পাহাড়ী হলুদ, আদা, জুম চাল", category: "Agri", gi: false },
+            { id: "rangamati", name: "রাঙ্গামাটি", division: "Chittagong", lat: 22.6574, lng: 92.1733, famous: "আনারস, কাঁঠাল, পাহাড়ী তাঁতের কাপড়", category: "Agri", gi: false },
+            { id: "bandarban", name: "বান্দরবান", division: "Chittagong", lat: 22.1953, lng: 92.2184, famous: "হিল জুস, পেঁপে, বাঁশের তৈরি খাবার", category: "Agri", gi: false },
+
+            // Sylhet Division
+            { id: "sylhet", name: "সিলেট", division: "Sylhet", lat: 24.8949, lng: 91.8687, famous: "শ্রীমঙ্গলের চা, সাতকড়া আচার, শীতল পাটি", category: "Food", gi: true },
+            { id: "moulvibazar", name: "মৌলভীবাজার", division: "Sylhet", lat: 24.4829, lng: 91.7774, famous: "আগর ও আতর, চা পাতা, আনারস", category: "Ayurvedic", gi: true },
+            { id: "habiganj", name: "হবিগঞ্জ", division: "Sylhet", lat: 24.3749, lng: 91.4155, famous: "চা, রতনপুরের তরমুজ", category: "Agri", gi: false },
+            { id: "sunamganj", name: "সুনামগঞ্জ", division: "Sylhet", lat: 25.0658, lng: 91.3950, famous: "হাউরের মাছ, শুঁটকি", category: "Food", gi: false },
+
+            // Khulna Division
+            { id: "khulna", name: "খুলনা", division: "Khulna", lat: 22.8456, lng: 89.5403, famous: "চুইঝাল, গলদা চিংড়ি, সন্দেশ", category: "Food", gi: true },
+            { id: "satkhira", name: "সাতক্ষীরা", division: "Khulna", lat: 22.7185, lng: 89.0705, famous: "সুন্দরবনের খাঁটি মধু, বাগদা চিংড়ি, সন্দেশ", category: "Agri", gi: true },
+            { id: "bagerhat", name: "বাগেরহাট", division: "Khulna", lat: 22.6516, lng: 89.7859, famous: "চিংড়ি মাছ, নারকেল, সুপারি", category: "Agri", gi: false },
+            { id: "jessore", name: "যশোর", division: "Khulna", lat: 23.1664, lng: 89.2081, famous: "খেজুর গুড়, জামতলার মিষ্টি, খই", category: "Food", gi: true },
+            { id: "kushtia", name: "কুষ্টিয়া", division: "Khulna", lat: 23.9013, lng: 89.1204, famous: "তিলের খাজা, কুলফি আইসক্রিম", category: "Food", gi: true },
+            { id: "meherpur", name: "মেহেরপুর", division: "Khulna", lat: 23.7622, lng: 88.6318, famous: "মিষ্টি সাবিত্রি, রসকদম্ব, মেহেরসাগর কলা", category: "Food", gi: true },
+            { id: "chuadanga", name: "চুয়াডাঙ্গা", division: "Khulna", lat: 23.6401, lng: 88.8418, famous: "পান, ভুট্টা, জিলিপি", category: "Agri", gi: false },
+            { id: "jhenaidah", name: "ঝিনাইদহ", division: "Khulna", lat: 23.5448, lng: 89.1539, famous: "হরি ধান, কলা", category: "Agri", gi: false },
+            { id: "magura", name: "মাগুরা", division: "Khulna", lat: 23.4873, lng: 89.4199, famous: "রসগোলা, লিচু", category: "Food", gi: false },
+            { id: "narail", name: "নড়াইল", division: "Khulna", lat: 23.1725, lng: 89.5126, famous: "পেড়ো সন্দেশ, খেজুর গুড়", category: "Food", gi: false },
+
+            // Barisal Division
+            { id: "barisal", name: "বরিশাল", division: "Barisal", lat: 22.7010, lng: 90.3535, famous: "বরিশালের আমড়া, ধান, ইলিশ", category: "Agri", gi: false },
+            { id: "bhola", name: "ভোলা", division: "Barisal", lat: 22.6859, lng: 90.6481, famous: "মহিষের দুধের দই, নারকেল", category: "Food", gi: false },
+            { id: "pirojpur", name: "পিরোজপুর", division: "Barisal", lat: 22.5841, lng: 89.9720, famous: "স্বরূপকাঠির পেয়ারা, ডাব, আমড়া", category: "Agri", gi: false },
+            { id: "patuakhali", name: "পটুয়াখালী", division: "Barisal", lat: 22.3596, lng: 90.3298, famous: "কুয়াকাটার শুঁটকি, তরমুজ", category: "Food", gi: false },
+            { id: "jhalokati", name: "ঝালকাঠি", division: "Barisal", lat: 22.6406, lng: 90.1987, famous: "শীতল পাটি, আটা, পেয়ারা", category: "Handicraft", gi: false },
+            { id: "barguna", name: "বরগুনা", division: "Barisal", lat: 22.1570, lng: 90.1256, famous: "চুইয়া পিঠা, শুঁটকি", category: "Food", gi: false },
+
+            // Rangpur Division
+            { id: "rangpur", name: "রংপুর", division: "Rangpur", lat: 25.7439, lng: 89.2752, famous: "শতরঞ্জি, হাঁড়িভাঙা আম", category: "Handicraft", gi: true },
+            { id: "dinajpur", name: "দিনাজপুর", division: "Rangpur", lat: 25.6279, lng: 88.6332, famous: "লিচু, কাটারীভোগ চাল, পাপড়", category: "Agri", gi: true },
+            { id: "gaibandha", name: "গাইবান্ধা", division: "Rangpur", lat: 25.3288, lng: 89.5403, famous: "রসমঞ্জরী মিষ্টি, মরিচ", category: "Food", gi: false },
+            { id: "kurigram", name: "কুড়িগ্রাম", division: "Rangpur", lat: 25.8058, lng: 89.6361, famous: "দুধ পিঠা, ধান, বাদাম", category: "Agri", gi: false },
+            { id: "nilphamari", name: "নীলফামারী", division: "Rangpur", lat: 25.9318, lng: 88.8560, famous: "ডোমারের সন্দেশ, তামাক", category: "Food", gi: false },
+            { id: "panchagarh", name: "পঞ্চগড়", division: "Rangpur", lat: 26.3411, lng: 88.5541, famous: "সমতলের চা, অর্গানিক বাদাম", category: "Agri", gi: false },
+            { id: "thakurgaon", name: "ঠাকুরগাঁও", division: "Rangpur", lat: 26.0336, lng: 88.4616, famous: "সূর্যপুরী আম, সিদল", category: "Agri", gi: false },
+            { id: "lalmonirhat", name: "লালমনিরহাট", division: "Rangpur", lat: 25.9159, lng: 89.4526, famous: "তামাক, ভুট্টা", category: "Agri", gi: false }
+        ];
+
+        // Global State Variables
+        let currentMarketMode = 'b2b';
+        let currentUser = null;
+        let map = null;
+        let satelliteTileLayer = null;
+        let streetTileLayer = null;
+        let activeMarkers = [];
+        let activePolyline = null;
+
+        // Initialize Web Application
+        document.addEventListener('DOMContentLoaded', () => {
+            initDivisionTabs();
+            renderDistrictButtons('all');
+            initLeafletMap();
+            renderProductsGrid(DISTRICTS_DATA);
+            updateCartBadge();
+        });
+
+        // Initialize Map
+        function initLeafletMap() {
+            map = L.map('map').setView([23.8103, 90.4125], 7);
+
+            streetTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            });
+
+            satelliteTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Satellite View'
+            });
+
+            streetTileLayer.addTo(map);
+            plotDistrictMarkers(DISTRICTS_DATA);
+        }
+
+        function toggleSatelliteView(isSatellite) {
+            if (isSatellite) {
+                map.removeLayer(streetTileLayer);
+                satelliteTileLayer.addTo(map);
+                document.getElementById('btnSat').className = "px-3 py-1 text-xs font-bold rounded bg-brandRed text-white";
+                document.getElementById('btnStreet').className = "px-3 py-1 text-xs font-bold rounded bg-gray-200 text-gray-700";
+            } else {
+                map.removeLayer(satelliteTileLayer);
+                streetTileLayer.addTo(map);
+                document.getElementById('btnStreet').className = "px-3 py-1 text-xs font-bold rounded bg-brandRed text-white";
+                document.getElementById('btnSat').className = "px-3 py-1 text-xs font-bold rounded bg-gray-200 text-gray-700";
+            }
+        }
+
+        function plotDistrictMarkers(districtList) {
+            // Clear markers
+            activeMarkers.forEach(m => map.removeLayer(m));
+            activeMarkers = [];
+
+            districtList.forEach(dist => {
+                const marker = L.marker([dist.lat, dist.lng]).addTo(map);
+                marker.bindPopup(`
+                    <div class="text-sm font-sans">
+                        <b class="text-brandRed text-base">${dist.name}</b> (${dist.division})<br/>
+                        <span class="text-xs text-gray-700"><b>প্রধান পণ্য:</b> ${dist.famous}</span><br/>
+                        <button onclick="filterProductsByDistrict('${dist.id}')" class="mt-2 bg-brandRed text-white text-xs px-2 py-1 rounded font-bold">পণ্য দেখুন</button>
+                    </div>
+                `);
+                activeMarkers.push(marker);
+            });
+        }
+
+        // Division & District Selection Logic
+        const DIVISIONS = [
+            { id: "all", name: "সব বিভাগ" },
+            { id: "Dhaka", name: "ঢাকা" },
+            { id: "Rajshahi", name: "রাজশাহী" },
+            { id: "Mymensingh", name: "ময়মনসিংহ" },
+            { id: "Chittagong", name: "চট্টগ্রাম" },
+            { id: "Sylhet", name: "সিলেট" },
+            { id: "Khulna", name: "খুলনা" },
+            { id: "Barisal", name: "বরিশাল" },
+            { id: "Rangpur", name: "রংপুর" }
+        ];
+
+        function initDivisionTabs() {
+            const container = document.getElementById('divisionTabs');
+            const select = document.getElementById('searchDistrictSelect');
+
+            DIVISIONS.forEach(div => {
+                const btn = document.createElement('button');
+                btn.className = `interactive-hover px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap bg-gray-100 border border-gray-300 text-gray-700 ${div.id === 'all' ? 'active-selection' : ''}`;
+                btn.innerText = div.name;
+                btn.onclick = () => {
+                    document.querySelectorAll('#divisionTabs button').forEach(b => b.classList.remove('active-selection'));
+                    btn.classList.add('active-selection');
+                    renderDistrictButtons(div.id);
+                };
+                container.appendChild(btn);
+            });
+
+            DISTRICTS_DATA.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.innerText = `${d.name} (${d.famous.split(',')[0]})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function renderDistrictButtons(divisionId) {
+            const grid = document.getElementById('districtButtonsGrid');
+            grid.innerHTML = '';
+
+            const filtered = divisionId === 'all' ? DISTRICTS_DATA : DISTRICTS_DATA.filter(d => d.division === divisionId);
+
+            filtered.forEach(dist => {
+                const b = document.createElement('button');
+                b.className = "interactive-hover p-2 rounded-xl border border-gray-200 bg-gray-50 text-left text-xs font-bold shadow-sm transition";
+                b.innerHTML = `
+                    <div class="text-brandRed text-sm">${dist.name}</div>
+                    <div class="text-[10px] text-gray-500 font-normal truncate">${dist.famous}</div>
+                `;
+                b.onclick = () => filterProductsByDistrict(dist.id);
+                grid.appendChild(b);
+            });
+        }
+
+        // Render Product Showcase Cards
+        function renderProductsGrid(list) {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = '';
+
+            document.getElementById('productCountBadge').innerText = `মোট দেখানো হচ্ছে: ${list.length} টি জেলা/পণ্য`;
+
+            list.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition flex flex-col justify-between";
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="relative h-44 bg-gray-900 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80" alt="${item.name}" class="w-full h-full object-cover opacity-80 hover:scale-105 transition duration-500">
+                            <div class="absolute top-3 left-3 bg-brandRed text-white text-[11px] font-black px-2.5 py-1 rounded-md shadow">
+                                ${item.name} জিলা
+                            </div>
+                            ${item.gi ? `<div class="absolute top-3 right-3 bg-brandGold text-gray-900 text-[10px] font-black px-2 py-0.5 rounded shadow"><i class="fa-solid fa-certificate"></i> GI স্বীকৃত</div>` : ''}
+                        </div>
+
+                        <div class="p-4 space-y-2">
+                            <h4 class="font-bold text-gray-900 text-base leading-snug">${item.famous}</h4>
+                            <p class="text-xs text-gray-500"><i class="fa-solid fa-location-dot text-brandRed mr-1"></i>মূল উৎপাদন পয়েন্ট: ${item.name}, ${item.division}</p>
+                            
+                            <div class="bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-xs space-y-1">
+                                <div class="flex justify-between text-gray-600">
+                                    <span>ডিলার মিনিমাম বাল্ক:</span>
+                                    <span class="font-bold text-gray-900">১০০ কেজি / ২০ পিস</span>
+                                </div>
+                                <div class="flex justify-between text-brandRed font-black text-sm pt-1 border-t border-gray-200">
+                                    <span>B2B পাইকারী দর:</span>
+                                    <span>৳ ২৫০ / ইউনিট</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 pt-0 space-y-2">
+                        <button onclick="viewProductRoute('${item.id}')" class="interactive-hover w-full py-2 bg-gray-900 text-white text-xs rounded-xl font-bold transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-route"></i> ম্যাপ ও সাপ্লাই রুট ট্র্যাকিং
+                        </button>
+                        <button onclick="requireAction('অর্ডার বা কোটেশন জমা দিতে')" class="w-full py-2.5 bg-brandRed hover:bg-brandRedDark text-white text-xs rounded-xl font-bold transition shadow">
+                            ${currentMarketMode === 'b2b' ? 'ডিলার কোটেশন অনুরোধ করুন' : 'কার্টে যোগ করুন'}
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Live Route Matrix on Satellite Leaflet Map
+        function viewProductRoute(districtId) {
+            const dist = DISTRICTS_DATA.find(d => d.id === districtId);
+            if (!dist) return;
+
+            // Focus map to district
+            map.flyTo([dist.lat, dist.lng], 10, { duration: 1.5 });
+
+            document.getElementById('selectedOriginText').innerHTML = `
+                উৎপাদন পয়েন্ট: <span class="text-white font-bold">${dist.name} (উপজেলা অরিজিন)</span><br/>
+                পণ্য: ${dist.famous}
+            `;
+
+            // Draw Route Line from Origin to User Location (Default Dhaka or Jamalpur)
+            if (activePolyline) map.removeLayer(activePolyline);
+
+            const userLat = 24.9375; // Jamalpur / Dhaka User Lat
+            const userLng = 89.9377;
+
+            activePolyline = L.polyline([
+                [dist.lat, dist.lng],
+                [userLat, userLng]
+            ], { color: '#e53935', weight: 4, dashArray: '8, 8' }).addTo(map);
+
+            alert(`${dist.name} জিলার ডিলার সাপ্লাই পয়েন্ট জিপিএস ম্যাপে লোড করা হয়েছে! স্যাটেলাইট ভিউতে রুট চেক করতে পারেন।`);
+        }
+
+        // Filter Logic
+        function filterProductsByDistrict(distId) {
+            if (distId === 'all') {
+                renderProductsGrid(DISTRICTS_DATA);
+                plotDistrictMarkers(DISTRICTS_DATA);
+                map.setView([23.8103, 90.4125], 7);
+            } else {
+                const filtered = DISTRICTS_DATA.filter(d => d.id === distId);
+                renderProductsGrid(filtered);
+                plotDistrictMarkers(filtered);
+                if (filtered.length > 0) {
+                    map.setView([filtered[0].lat, filtered[0].lng], 9);
+                }
+            }
+        }
+
+        function filterCategory(cat) {
+            if (cat === 'all') {
+                renderProductsGrid(DISTRICTS_DATA);
+            } else if (cat === 'GI') {
+                renderProductsGrid(DISTRICTS_DATA.filter(d => d.gi));
+            } else {
+                renderProductsGrid(DISTRICTS_DATA.filter(d => d.category === cat));
+            }
+        }
+
+        function searchProducts(query) {
+            const q = query.toLowerCase().trim();
+            const filtered = DISTRICTS_DATA.filter(d => 
+                d.name.toLowerCase().includes(q) || 
+                d.famous.toLowerCase().includes(q) || 
+                d.division.toLowerCase().includes(q)
+            );
+            renderProductsGrid(filtered);
+        }
+
+        function switchMarketMode(mode) {
+            currentMarketMode = mode;
+            if (mode === 'b2b') {
+                document.getElementById('modeB2B').className = "px-3 py-1.5 rounded-md bg-brandRed text-white shadow";
+                document.getElementById('modeB2C').className = "px-3 py-1.5 rounded-md text-gray-600 hover:text-gray-900";
+            } else {
+                document.getElementById('modeB2C').className = "px-3 py-1.5 rounded-md bg-brandRed text-white shadow";
+                document.getElementById('modeB2B').className = "px-3 py-1.5 rounded-md text-gray-600 hover:text-gray-900";
+            }
+            renderProductsGrid(DISTRICTS_DATA);
+        }
+
+        // Authentication & Role Modal Enforcement
+        function openAuthModal(defaultRole) {
+            if (defaultRole) document.getElementById('userRoleSelect').value = defaultRole;
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        function requireAction(actionName) {
+            if (!currentUser) {
+                document.getElementById('authReasonText').innerText = `আপনি "${actionName}" নির্বাচন করেছেন। অনুগ্রহ করে প্রথমে লগইন বা প্রোফাইল তৈরি করুন।`;
+                openAuthModal();
+            } else {
+                alert(`ধন্যবাদ ${currentUser.name}! আপনার ${currentUser.role} প্রোফাইল থেকে অনুরোধ সফলভাবে গ্রহণ করা হয়েছে।`);
+            }
+        }
+
+        function handleUserRegistration(e) {
+            e.preventDefault();
+            const role = document.getElementById('userRoleSelect').value;
+            const name = document.getElementById('userNameInput').value;
+            const phone = document.getElementById('userPhoneInput').value;
+            const loc = document.getElementById('userLocInput').value;
+
+            currentUser = { role, name, phone, loc };
+
+            document.getElementById('navUserName').innerText = `${name} (${role})`;
+            closeAuthModal();
+
+            alert(`অভিনন্দন ${name}! আপনি ${role} হিসেবে All In Business প্ল্যাটফর্মে সফলভাবে লগইন করেছেন।`);
+        }
+
+        function updateCartBadge() {
+            document.getElementById('cartCount').innerText = currentUser ? '2' : '0';
+        }
+    </script>
+</body>
+</html>
