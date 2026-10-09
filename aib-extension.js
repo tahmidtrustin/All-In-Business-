@@ -1,4 +1,4 @@
-/* All In Business - Extension v3 (আসল index.html অপরিবর্তিত) */
+/* All In Business - Extension v4 (আসল index.html অপরিবর্তিত) */
 (function () {
   const GMAPS_KEY = ""; // ঐচ্ছিক
   const SPONSOR = "https://trustinuniver.wordpress.com";
@@ -17,16 +17,26 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const opts = (o) => Object.entries(o).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
   const inp = "w-full border border-gray-300 rounded-lg p-2.5 text-sm";
+  const lbl = "block text-[11px] font-bold text-gray-600 mb-0.5";
   const grid = $("productsGrid");
   const prodSection = grid.closest("section");
-  prodSection.style.scrollMarginTop = "150px";
+  prodSection.style.scrollMarginTop = "200px";
+  const modal = (id, title, body) => `<div id="${id}" class="fixed inset-0 bg-black/70 z-[60] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto"><div class="bg-brandDark text-white p-4 flex justify-between items-center"><h3 class="font-black">${title}</h3><button onclick="aib.close('${id}')" class="text-2xl leading-none">×</button></div><div class="p-5">${body}</div></div></div>`;
 
-  // ================= UI (নতুন কোনো পণ্য-সেকশন নয়; শুধু বাটন/ফর্ম ও লগইন) =================
+  // ================= হেডারে নতুন অ্যাকশন বার (ক্যাটাগরি বারের ঠিক নিচে) =================
+  const nav = [["fa-store", "আমার স্টোর", "aib.openStore()"], ["fa-plus", "পণ্য যোগ (বিক্রি)", "aib.openProd('sell')"], ["fa-cart-plus", "কিনতে চাই (ক্রয় রিকোয়েস্ট)", "aib.openProd('buy')"],
+    ["fa-comments", "চ্যাট রুম", "aib.goChat()"], ["fa-map-location-dot", "লোকেশন / ম্যাপ", "aib.goMap()"]];
+  document.querySelector("header").insertAdjacentHTML("beforeend", `
+  <div class="bg-gray-800 text-gray-100 border-t border-gray-700"><div class="max-w-7xl mx-auto px-4 flex items-center overflow-x-auto text-sm">
+   ${nav.map(([ic, t, fn]) => `<div onclick="${fn}" class="interactive-hover px-4 py-2.5 font-semibold border-r border-gray-700 flex items-center gap-2 whitespace-nowrap"><i class="fa-solid ${ic}"></i> ${t}</div>`).join("")}
+  </div></div>`);
+
+  // ================= পপআপ (নিচে কোনো নতুন সেকশন নয়) =================
   document.body.insertAdjacentHTML("beforeend", `
   <div id="aibAuth" class="fixed inset-0 bg-black/70 z-[60] hidden flex items-center justify-center p-4">
    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto">
     <div class="bg-brandDark text-white p-5 text-center relative">
-     <button onclick="aib.closeAuth()" class="absolute top-3 right-4 text-xl">×</button>
+     <button onclick="aib.close('aibAuth')" class="absolute top-3 right-4 text-xl">×</button>
      <h3 class="text-xl font-black">All In Business</h3>
      <p id="aibAuthMsg" class="text-xs text-gray-300 mt-1">Before any action, sign in. Your selected role is saved to your profile.</p>
     </div>
@@ -37,53 +47,54 @@
     <form onsubmit="aib.submitAuth(event)" class="p-5 space-y-3">
      <div id="upOnly" class="space-y-3 hidden">
       <select id="aRole" class="${inp} font-semibold">${opts(ROLES)}</select>
-      <input id="aName" placeholder="Full name" class="${inp}">
-      <input id="aBiz" placeholder="Business / shop name" class="${inp}">
+      <input id="aName" placeholder="Full name (পূর্ণ নাম)" class="${inp}">
+      <input id="aBiz" placeholder="Business / shop name (ক্রেতা ছাড়া বাধ্যতামূলক)" class="${inp}">
       <select id="aCat" class="${inp}">${opts(CATS)}</select>
-      <input id="aPhone" placeholder="Mobile (017XXXXXXXX)" class="${inp}">
+      <input id="aPhone" placeholder="Mobile (01XXXXXXXXX)" class="${inp}">
+      <input id="aNid" placeholder="NID / ট্রেড লাইসেন্স নম্বর (ক্রেতা ছাড়া বাধ্যতামূলক)" class="${inp}">
       <input id="aLoc" placeholder="জেলা ও উপজেলা" class="${inp}">
-      <button type="button" onclick="aib.getGPS('aGps')" class="text-xs bg-gray-100 border rounded px-3 py-2 w-full">📍 আমার বর্তমান লোকেশন নিন <span id="aGps"></span></button>
+      <input id="aAddr" placeholder="পূর্ণ ঠিকানা (গ্রাম/বাজার/রোড)" class="${inp}">
+      <button type="button" onclick="aib.getGPS('aGps')" class="text-xs bg-gray-100 border rounded px-3 py-2 w-full">📍 আমার বর্তমান লোকেশন নিন (ক্রেতা ছাড়া বাধ্যতামূলক) <span id="aGps"></span></button>
+      <p class="text-[11px] text-gray-500">মিথ্যা তথ্য দিলে অ্যাকাউন্ট বাতিল হবে। অ্যাডমিন যাচাই করলে ✅ ভেরিফাইড ব্যাজ পাবেন।</p>
      </div>
      <input id="aEmail" type="email" required placeholder="Email" class="${inp}">
      <input id="aPass" type="password" required minlength="6" placeholder="Password" class="${inp}">
      <button class="w-full bg-brandRed text-white py-3 rounded-xl font-bold" id="aSubmit">Sign in</button>
     </form>
    </div>
-  </div>`);
+  </div>
+  ${modal("aibProfile", "আমার প্রোফাইল", `<div id="profBody" class="text-sm space-y-2"></div>`)}
+  ${modal("aibStore", "আমার স্টোর", `
+   <div id="myStores" class="mb-4 space-y-2 text-sm"></div>
+   <form onsubmit="aib.addStore(event)" class="space-y-2">
+    <p class="text-xs text-gray-500">নতুন স্টোর খুলুন। সঠিক তথ্য দিন, অ্যাডমিন যাচাই করে ✅ ভেরিফাইড করবে।</p>
+    <div><label class="${lbl}">স্টোরের নাম *</label><input id="sName" required class="${inp}"></div>
+    <div><label class="${lbl}">ক্যাটাগরি *</label><select id="sCat" class="${inp}">${opts(CATS)}</select></div>
+    <div><label class="${lbl}">মালিকের নাম *</label><input id="sOwner" required class="${inp}"></div>
+    <div><label class="${lbl}">মোবাইল *</label><input id="sPhone" required class="${inp}" placeholder="01XXXXXXXXX"></div>
+    <div><label class="${lbl}">ট্রেড লাইসেন্স / NID নম্বর *</label><input id="sLic" required class="${inp}"></div>
+    <div><label class="${lbl}">জেলা ও উপজেলা *</label><input id="sDist" required class="${inp}"></div>
+    <div><label class="${lbl}">পূর্ণ ঠিকানা *</label><input id="sAddr" required class="${inp}"></div>
+    <div><label class="${lbl}">ওয়েবসাইট / ফেসবুক পেজ লিংক</label><input id="sWeb" class="${inp}"></div>
+    <div><label class="${lbl}">স্টোরের বিবরণ</label><input id="sDesc" class="${inp}"></div>
+    <button type="button" onclick="aib.getGPS('sGps')" class="text-xs bg-gray-100 border rounded p-2 w-full">📍 স্টোরের লোকেশন নিন (বাধ্যতামূলক) <span id="sGps"></span></button>
+    <button class="w-full bg-brandRed text-white rounded-lg font-bold py-2.5">স্টোর তৈরি করুন</button>
+   </form>`)}
+  ${modal("aibProd", "পণ্য যোগ করুন", `
+   <form id="prodForm" onsubmit="aib.addProduct(event)" class="space-y-2">
+    <div><label class="${lbl}">ধরন</label><select id="pKind" class="${inp}"><option value="sell">আমি বিক্রি করব (Sell)</option><option value="buy">আমি কিনতে চাই (Buy request)</option></select></div>
+    <div><label class="${lbl}">পণ্যের নাম *</label><input id="pTitle" required class="${inp}"></div>
+    <div><label class="${lbl}">ক্যাটাগরি *</label><select id="pCat" class="${inp}">${opts(CATS)}</select></div>
+    <div class="grid grid-cols-2 gap-2"><div><label class="${lbl}">দাম (৳)</label><input id="pPrice" type="number" class="${inp}"></div><div><label class="${lbl}">পরিমাণ</label><input id="pQty" class="${inp}" placeholder="১০০ কেজি"></div></div>
+    <div><label class="${lbl}">জেলা *</label><input id="pDist" required class="${inp}"></div>
+    <div><label class="${lbl}">আমার স্টোর</label><select id="pStore" class="${inp}"><option value="">স্টোর ছাড়া</option></select></div>
+    <div><label class="${lbl}">বিবরণ</label><input id="pDesc" class="${inp}"></div>
+    <button class="w-full bg-brandRed text-white rounded-lg font-bold py-2.5">প্রকাশ করুন</button>
+   </form>`)}`);
 
-  // বিদ্যমান "পণ্যসমূহ" সেকশনের গ্রিডের ঠিক উপরে: শুধু অ্যাকশন বাটন + ফর্ম
-  grid.insertAdjacentHTML("beforebegin", `
-  <div id="aibTools" class="mb-5 space-y-3">
-   <div class="flex flex-wrap gap-2 text-xs font-bold">
-    <button onclick="aib.openProd('sell')" class="bg-brandRed text-white px-3 py-2 rounded-lg">+ পণ্য যোগ করুন (বিক্রি)</button>
-    <button onclick="aib.openProd('buy')" class="bg-blue-700 text-white px-3 py-2 rounded-lg">+ ক্রয় রিকোয়েস্ট</button>
-    <button onclick="aib.guard(()=>aib.toggle('storeForm'))" class="bg-brandDark text-white px-3 py-2 rounded-lg">+ আমার স্টোর</button>
-    <button onclick="aib.guard(()=>aib.toggle('myProfile'))" class="bg-gray-200 px-3 py-2 rounded-lg">আমার প্রোফাইল</button>
-   </div>
-   <div id="myProfile" class="hidden bg-gray-50 border rounded-xl p-4 text-sm"></div>
-   <form id="storeForm" onsubmit="aib.addStore(event)" class="hidden grid md:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border">
-    <input id="sName" required placeholder="স্টোরের নাম" class="${inp}">
-    <select id="sCat" class="${inp}">${opts(CATS)}</select>
-    <input id="sDesc" placeholder="স্টোরের বিবরণ" class="${inp}">
-    <button type="button" onclick="aib.getGPS('sGps')" class="text-xs bg-white border rounded p-2">📍 স্টোর লোকেশন <span id="sGps"></span></button>
-    <button class="bg-brandRed text-white rounded-lg font-bold py-2 md:col-span-2">স্টোর তৈরি করুন</button>
-   </form>
-   <form id="prodForm" onsubmit="aib.addProduct(event)" class="hidden grid md:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border">
-    <select id="pKind" class="${inp}"><option value="sell">আমি বিক্রি করব (Sell)</option><option value="buy">আমি কিনতে চাই (Buy request)</option></select>
-    <input id="pTitle" required placeholder="পণ্যের নাম" class="${inp}">
-    <select id="pCat" class="${inp}">${opts(CATS)}</select>
-    <input id="pPrice" type="number" placeholder="দাম (৳)" class="${inp}">
-    <input id="pQty" placeholder="পরিমাণ (যেমন ১০০ কেজি)" class="${inp}">
-    <input id="pDist" placeholder="জেলা" class="${inp}">
-    <select id="pStore" class="${inp}"><option value="">স্টোর ছাড়া</option></select>
-    <input id="pDesc" placeholder="বিবরণ" class="${inp} md:col-span-2">
-    <button class="bg-brandRed text-white rounded-lg font-bold py-2 md:col-span-3">প্রকাশ করুন</button>
-   </form>
-  </div>`);
-
-  // চ্যাট ও ইউজার-লোকেশন (পণ্য সেকশনের নিচে)
+  // চ্যাট ও Google লোকেশন (হেডারের লিংক এখানে নিয়ে আসবে)
   document.querySelector("main").insertAdjacentHTML("beforeend", `
-  <section id="aibChatMap" style="scroll-margin-top:150px" class="grid lg:grid-cols-2 gap-6">
+  <section id="aibChatMap" style="scroll-margin-top:200px" class="grid lg:grid-cols-2 gap-6">
    <div class="bg-white p-5 rounded-2xl shadow-md border">
     <div class="flex justify-between items-center mb-2">
      <h3 class="font-bold"><i class="fa-solid fa-comments text-brandRed"></i> কমন চ্যাট রুম</h3>
@@ -110,75 +121,107 @@
   </div>`);
 
   // ================= Actions =================
+  const badge = (v) => v ? `<span class="text-[10px] font-black px-2 py-0.5 rounded bg-green-100 text-green-700">✅ ভেরিফাইড</span>` : `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">যাচাই চলছে</span>`;
   const aib = (window.aib = {
+    open(id) { $(id).classList.remove("hidden"); }, close(id) { $(id).classList.add("hidden"); },
     tab(m) { mode = m; $("upOnly").classList.toggle("hidden", m === "in"); $("aSubmit").innerText = m === "in" ? "Sign in" : "Create account";
       $("tabIn").className = "flex-1 py-3 " + (m === "in" ? "bg-brandRed text-white" : "bg-gray-200"); $("tabUp").className = "flex-1 py-3 " + (m === "up" ? "bg-brandRed text-white" : "bg-gray-200"); },
-    closeAuth() { $("aibAuth").classList.add("hidden"); },
-    toggle(id) { $(id).classList.toggle("hidden"); },
     guard(fn) { if (!me) return openAuthModal(); fn(); },
-    openProd(kind) { aib.guard(() => { $("prodForm").classList.remove("hidden"); $("pKind").value = kind; if (catFilter !== "all") $("pCat").value = catFilter; prodSection.scrollIntoView({ behavior: "smooth" }); }); },
+    goChat() { $("aibChatMap").scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("chatIn").focus({ preventScroll: true }), 600); },
+    goMap() { $("map").closest("section").scrollIntoView({ behavior: "smooth" }); },
+    openProfile() { renderProfile(); aib.open("aibProfile"); },
+    openStore() { aib.guard(() => {
+      if (me.role === "Buyer") return alert("স্টোর খুলতে Seller / Dealer / Wholesaler অ্যাকাউন্ট লাগবে। ক্রেতা হিসেবে আপনি ক্রয় রিকোয়েস্ট দিতে পারবেন।");
+      $("sOwner").value ||= me.full_name || ""; $("sPhone").value ||= me.phone || ""; $("sLic").value ||= me.nid_or_license || ""; $("sDist").value ||= me.location_text || ""; $("sAddr").value ||= me.address || "";
+      renderMyStores(); aib.open("aibStore"); }); },
+    openProd(kind) { aib.guard(() => {
+      if (kind === "sell" && me.role === "Buyer") return alert("পণ্য বিক্রি করতে Seller / Dealer / Wholesaler অ্যাকাউন্ট লাগবে। আপনি \"কিনতে চাই\" দিয়ে ক্রয় রিকোয়েস্ট দিতে পারবেন।");
+      $("pKind").value = kind; if (catFilter !== "all") $("pCat").value = catFilter; $("pDist").value ||= ""; aib.open("aibProd"); }); },
     getGPS(el) { navigator.geolocation.getCurrentPosition((p) => { gps[el] = { lat: p.coords.latitude, lng: p.coords.longitude }; $(el).innerText = "✅ নেওয়া হয়েছে"; }, () => alert("লোকেশন পারমিশন দিন")); },
     saveLoc() {
       navigator.geolocation.getCurrentPosition(async (p) => {
         const { error } = await db.from("profiles").update({ lat: p.coords.latitude, lng: p.coords.longitude }).eq("id", me.id);
-        if (error) return alert(error.message); me.lat = p.coords.latitude; me.lng = p.coords.longitude; alert("লোকেশন সেভ হয়েছে"); refreshMaps();
+        if (error) return alert(error.message); me.lat = p.coords.latitude; me.lng = p.coords.longitude; alert("লোকেশন সেভ হয়েছে"); renderProfile(); refreshMaps();
       }, () => alert("লোকেশন পারমিশন দিন"));
     },
     async submitAuth(e) {
       e.preventDefault(); const email = $("aEmail").value, password = $("aPass").value;
       if (mode === "up") {
+        const role = $("aRole").value, v = (i) => $(i).value.trim();
+        if (!v("aName")) return alert("পূর্ণ নাম দিন");
+        if (!/^01[3-9]\d{8}$/.test(v("aPhone"))) return alert("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)");
+        if (role !== "Buyer") {
+          if (!v("aBiz") || !v("aNid") || !v("aLoc") || !v("aAddr")) return alert("ব্যবসার নাম, NID/ট্রেড লাইসেন্স, জেলা-উপজেলা ও পূর্ণ ঠিকানা বাধ্যতামূলক");
+          if (!gps.aGps) return alert("আপনার বর্তমান লোকেশন (GPS) নিন");
+        }
         const { data, error } = await db.auth.signUp({ email, password });
         if (error) return alert(error.message);
         if (!data.user) return alert("এই ইমেইল দিয়ে আগে অ্যাকাউন্ট খোলা হয়েছে। Sign in করুন।");
         if (!data.session) return alert("ইমেইল কনফার্ম করে Sign in করুন (অথবা Supabase এ Confirm email বন্ধ করুন)");
-        const p = { id: data.user.id, full_name: $("aName").value, business_name: $("aBiz").value, role: $("aRole").value, category: $("aCat").value,
-          phone: $("aPhone").value, location_text: $("aLoc").value, lat: gps.aGps?.lat, lng: gps.aGps?.lng };
-        const r = await db.from("profiles").upsert(p); if (r.error) return alert(r.error.message);
+        const r = await db.from("profiles").upsert({ id: data.user.id, full_name: v("aName"), business_name: v("aBiz"), role, category: $("aCat").value, phone: v("aPhone"),
+          nid_or_license: v("aNid"), location_text: v("aLoc"), address: v("aAddr"), lat: gps.aGps?.lat, lng: gps.aGps?.lng });
+        if (r.error) return alert(r.error.message);
       } else {
         const { error } = await db.auth.signInWithPassword({ email, password }); if (error) return alert(error.message);
       }
-      aib.closeAuth(); await loadMe();
+      aib.close("aibAuth"); await loadMe();
     },
     async addStore(e) {
-      e.preventDefault(); const g = gps.sGps || {};
-      const { error } = await db.from("stores").insert({ owner: me.id, name: $("sName").value, category: $("sCat").value, description: $("sDesc").value, lat: g.lat ?? me.lat, lng: g.lng ?? me.lng });
-      if (error) return alert(error.message); e.target.reset(); aib.toggle("storeForm"); await loadStores(); refreshMaps();
+      e.preventDefault(); const g = gps.sGps || (me.lat ? { lat: me.lat, lng: me.lng } : null);
+      if (!g) return alert("স্টোরের লোকেশন (GPS) নিন");
+      if (!/^01[3-9]\d{8}$/.test($("sPhone").value.trim())) return alert("সঠিক মোবাইল নম্বর দিন");
+      const { error } = await db.from("stores").insert({ owner: me.id, name: $("sName").value, category: $("sCat").value, description: $("sDesc").value, owner_name: $("sOwner").value,
+        phone: $("sPhone").value, trade_license: $("sLic").value, district: $("sDist").value, address: $("sAddr").value, website: $("sWeb").value, lat: g.lat, lng: g.lng });
+      if (error) return alert(error.message); e.target.reset(); await loadStores(); renderMyStores(); refreshMaps(); alert("স্টোর তৈরি হয়েছে। যাচাইয়ের পর ✅ ভেরিফাইড ব্যাজ পাবেন।");
     },
     async addProduct(e) {
-      e.preventDefault();
+      e.preventDefault(); const kind = $("pKind").value;
+      if (kind === "sell" && me.role === "Buyer") return alert("পণ্য বিক্রি করতে Seller / Dealer / Wholesaler অ্যাকাউন্ট লাগবে");
+      if (kind === "sell" && (!me.phone || !me.nid_or_license)) return alert("বিক্রি করতে প্রোফাইলে মোবাইল ও NID/ট্রেড লাইসেন্স থাকতে হবে");
       const { error } = await db.from("products").insert({ owner: me.id, owner_name: me.business_name || me.full_name, store_id: $("pStore").value || null, title: $("pTitle").value, category: $("pCat").value,
-        kind: $("pKind").value, price: $("pPrice").value || null, qty: $("pQty").value, district: $("pDist").value, description: $("pDesc").value });
-      if (error) return alert(error.message); e.target.reset(); aib.toggle("prodForm"); loadProducts();
+        kind, price: $("pPrice").value || null, qty: $("pQty").value, district: $("pDist").value, description: $("pDesc").value });
+      if (error) return alert(error.message); e.target.reset(); aib.close("aibProd"); loadProducts();
     },
     async del(id) { if (!confirm("পণ্যটি মুছবেন?")) return; const { error } = await db.from("products").delete().eq("id", id); if (error) alert(error.message); loadProducts(); },
     review(pid) {
       aib.guard(async () => { const r = parseInt(prompt("রেটিং দিন (১-৫):"), 10); if (!(r >= 1 && r <= 5)) return; const c = prompt("মন্তব্য:") || "";
         const { error } = await db.from("reviews").insert({ product_id: pid, user_id: me.id, user_name: me.full_name, rating: r, comment: c }); if (error) alert(error.message); loadProducts(); });
     },
-    contact(el) { aib.guard(() => { $("chatIn").value = `@${el.dataset.n} আপনার পণ্য "${el.dataset.t}" সম্পর্কে জানতে চাই — `; $("aibChatMap").scrollIntoView({ behavior: "smooth" }); $("chatIn").focus(); }); },
+    contact(el) { aib.guard(() => { $("chatIn").value = `@${el.dataset.n} আপনার পণ্য "${el.dataset.t}" সম্পর্কে জানতে চাই — `; aib.goChat(); }); },
     async send(e) {
       e.preventDefault(); if (!me) return openAuthModal(); const b = $("chatIn").value.trim(); if (!b) return;
       const { data, error } = await db.from("messages").insert({ user_id: me.id, user_name: me.full_name, body: b }).select().single();
       if (error) return alert(error.message); $("chatIn").value = ""; addMsg(data);
     },
-    async signOut() { await db.auth.signOut(); me = null; $("navUserName").innerText = "প্রোফাইল / লগইন"; $("myProfile").classList.add("hidden"); refresh(); },
+    async signOut() { await db.auth.signOut(); me = null; aib.close("aibProfile"); $("navUserName").innerText = "প্রোফাইল / লগইন"; refresh(); },
     gToggle() { gType = gType === "k" ? "m" : "k"; const f = $("gframe"); if (f) f.src = f.src.replace(/t=[km]/, "t=" + gType); },
     showLoc(lat, lng) { if (GMAPS_KEY && window.gmapObj) { gmapObj.setCenter({ lat, lng }); gmapObj.setZoom(15); } else drawFrame(`${lat},${lng}`, 15); },
   });
 
+  function renderProfile() {
+    if (!me) return;
+    $("profBody").innerHTML = `<div class="text-base font-black">${esc(me.full_name)} ${badge(me.verified)}</div>
+     <div>${esc(ROLES[me.role] || me.role)} · ${esc(CATS[me.category] || "")}</div>
+     <div>ব্যবসা: ${esc(me.business_name || "—")}</div><div>📞 ${esc(me.phone || "—")}</div><div>🪪 ${esc(me.nid_or_license || "—")}</div>
+     <div>📍 ${esc(me.location_text || "—")} ${me.address ? "· " + esc(me.address) : ""} ${me.lat ? "(GPS ✅)" : "(GPS নেই)"}</div>
+     <div class="flex flex-wrap gap-3 pt-2 font-bold"><button onclick="aib.saveLoc()" class="text-blue-700">📍 লোকেশন আপডেট</button><button onclick="aib.signOut()" class="text-red-600">Sign out</button></div>`;
+  }
+  function renderMyStores() {
+    const mine = S.filter((s) => me && s.owner === me.id);
+    $("myStores").innerHTML = mine.length ? `<div class="font-bold">আপনার স্টোরসমূহ:</div>` + mine.map((s) => `<div class="border rounded-lg p-2">🏪 <b>${esc(s.name)}</b> ${badge(s.verified)}<div class="text-xs text-gray-500">${esc(CATS[s.category] || "")} · ${esc(s.district || "")}</div></div>`).join("") : "";
+  }
+
   // ================= বিদ্যমান ফাংশনের সাথে সংযোগ =================
-  // ১) আসল renderProductsGrid চলার পর একই গ্রিডে ইউজারদের পণ্য যোগ হবে
   const oldRender = window.renderProductsGrid;
   window.renderProductsGrid = (list) => {
     lastList = list; oldRender(list);
     const ups = userList();
     if (ups.length) grid.insertAdjacentHTML("afterbegin", ups.map(card).join(""));
-    else if (!list.length) grid.innerHTML = `<p class="text-gray-500 text-sm col-span-full">এই ক্যাটাগরিতে এখনো কোনো পণ্য নেই। উপরের "+ পণ্য যোগ করুন" বাটনে চাপ দিয়ে প্রথম পণ্যটি আপনিই যোগ করুন!</p>`;
+    else if (!list.length) grid.innerHTML = `<p class="text-gray-500 text-sm col-span-full">এই ক্যাটাগরিতে এখনো কোনো পণ্য নেই। উপরের "পণ্য যোগ" বাটনে চাপ দিয়ে প্রথম পণ্যটি আপনিই যোগ করুন!</p>`;
     $("productCountBadge").innerText = `মোট দেখানো হচ্ছে: ${list.length + ups.length} টি`;
   };
   function refresh() { window.renderProductsGrid(lastList || DISTRICTS_DATA); }
 
-  // ২) বিদ্যমান ক্যাটাগরি বার (এগ্রিকালচার, খাবার, হস্তশিল্প, আয়ুর্বেদিক, GI): শুধু ওই ক্যাটাগরির পণ্য, বাকিগুলো লুকানো
   const oldCat = window.filterCategory;
   function applyCat(c, scroll) {
     catFilter = c; distFilter = "all"; oldCat(c);
@@ -187,7 +230,6 @@
     if (scroll) prodSection.scrollIntoView({ behavior: "smooth" });
   }
   window.filterCategory = (c) => applyCat(c, true);
-
   const oldDist = window.filterProductsByDistrict;
   window.filterProductsByDistrict = (id) => { distFilter = id; catFilter = "all"; oldDist(id); if (id !== "all") prodSection.scrollIntoView({ behavior: "smooth" }); };
   const oldSearch = window.searchProducts;
@@ -195,15 +237,12 @@
   const oldMode = window.switchMarketMode;
   window.switchMarketMode = (m) => { oldMode(m); applyCat(catFilter, false); };
 
-  // ৩) সব অ্যাকশনের আগে লগইন
-  window.openAuthModal = () => {
-    if (me) { $("myProfile").classList.remove("hidden"); return $("aibTools").scrollIntoView({ behavior: "smooth", block: "center" }); }
-    $("aibAuth").classList.remove("hidden"); aib.tab(mode);
-  };
+  // লগইন/প্রোফাইল: আগের হেডার বাটনই ব্যবহার হবে (লগইন না থাকলে সাইন-ইন, থাকলে প্রোফাইল পপআপ)
+  window.openAuthModal = () => { if (me) return aib.openProfile(); aib.open("aibAuth"); aib.tab(mode); };
   window.requireAction = (name) => {
     if (!me) { $("aibAuthMsg").innerText = `"${name}" এর আগে সাইন ইন করুন। আপনার রোল প্রোফাইলে সেভ হবে।`; return openAuthModal(); }
     if (name.includes("কোটেশন")) return aib.openProd("buy");
-    if (name.includes("ডিলার")) return aib.guard(() => $("myProfile").classList.remove("hidden"));
+    if (name.includes("ডিলার")) return aib.openProfile();
     prodSection.scrollIntoView({ behavior: "smooth" });
   };
   const oldRoute = window.viewProductRoute;
@@ -223,7 +262,7 @@
       <div class="relative h-28 bg-gradient-to-br from-brandDark to-gray-700 flex items-center justify-center text-white text-4xl">
        <i class="fa-solid ${p.kind === "buy" ? "fa-hand-holding-dollar" : "fa-basket-shopping"}"></i>
        <div class="absolute top-3 left-3 bg-brandRed text-white text-[11px] font-black px-2.5 py-1 rounded-md shadow">${p.kind === "buy" ? "ক্রয় রিকোয়েস্ট" : "বিক্রয়"}</div>
-       <div class="absolute top-3 right-3 bg-brandGold text-gray-900 text-[10px] font-black px-2 py-0.5 rounded shadow">ইউজার পণ্য</div>
+       <div class="absolute top-3 right-3">${badge(ow.verified)}</div>
       </div>
       <div class="p-4 space-y-2">
        <h4 class="font-bold text-gray-900 text-base leading-snug">${esc(p.title)}</h4>
@@ -251,16 +290,14 @@
     const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
     me = data || { id: user.id, full_name: user.email, role: "Buyer" };
     $("navUserName").innerText = `${me.full_name} (${me.role})`;
-    $("myProfile").innerHTML = `<b>${esc(me.full_name)}</b> · ${esc(ROLES[me.role] || me.role)}<br>স্টোর/ব্যবসা: ${esc(me.business_name)} · ক্যাটাগরি: ${esc(CATS[me.category] || "")}<br>📞 ${esc(me.phone)} · 📍 ${esc(me.location_text)} ${me.lat ? "(GPS ✅)" : "(GPS নেই)"}<br>
-     <button onclick="aib.saveLoc()" class="mt-2 mr-3 text-blue-700 font-bold">📍 আমার লোকেশন আপডেট</button><button onclick="aib.signOut()" class="mt-2 text-red-600 font-bold">Sign out</button>`;
     await loadStores(); loadProducts(); refreshMaps();
   }
   async function loadStores() {
-    const { data } = await db.from("stores").select("id,name,category,owner"); S = data || [];
+    const { data } = await db.from("stores").select("*"); S = data || [];
     $("pStore").innerHTML = `<option value="">স্টোর ছাড়া</option>` + S.filter((s) => me && s.owner === me.id).map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
   }
   async function loadProducts() {
-    const [a, b, c] = await Promise.all([db.from("products").select("*").order("created_at", { ascending: false }).limit(300), db.from("reviews").select("*"), db.from("profiles").select("id,phone,role")]);
+    const [a, b, c] = await Promise.all([db.from("products").select("*").order("created_at", { ascending: false }).limit(300), db.from("reviews").select("*"), db.from("profiles").select("*")]);
     if (a.error) return console.error(a.error.message);
     P = a.data || []; R = b.data || []; U = {}; (c.data || []).forEach((u) => (U[u.id] = u)); refresh();
   }
