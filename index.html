@@ -7,6 +7,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet OpenStreetMap & Satellite Map Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Font Awesome -->
@@ -310,6 +311,14 @@
 
     <!-- JavaScript Data & Logic Application Engine -->
     <script>
+        // ১. Supabase SDK লোড ও ক্লায়েন্ট ইনিশিয়ালাইজেশন
+const SUPABASE_URL = 'https://mqovzooaxhpovthmuyhi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xb3Z6b29heGhwb3Z0aG11eWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk1MTUsImV4cCI6MjEwNjk2NTUxNX0.deLsE3CbWE2wC321eyEuVspr7zw_vP-Y0Y3RV7zHFhs';
+
+let supabaseClient = null;
+if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
         // Database of Bangladesh 64 Districts with Genuine Specialities
         const DISTRICTS_DATA = [
             // Rajshahi Division
