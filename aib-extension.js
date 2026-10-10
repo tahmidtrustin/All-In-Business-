@@ -21,7 +21,7 @@
   const grid = $("productsGrid");
   const prodSection = grid.closest("section");
   prodSection.style.scrollMarginTop = "200px";
-  const modal = (id, title, body) => `<div id="${id}" class="fixed inset-0 bg-black/70 z-[60] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto"><div class="bg-brandDark text-white p-4 flex justify-between items-center"><h3 class="font-black">${title}</h3><button onclick="aib.close('${id}')" class="text-2xl leading-none">×</button></div><div class="p-5">${body}</div></div></div>`;
+  const modal = (id, title, body, wide) => `<div id="${id}" class="fixed inset-0 bg-black/70 z-[60] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl ${wide ? "max-w-3xl" : "max-w-lg"} w-full max-h-[92vh] overflow-y-auto"><div class="bg-brandDark text-white p-4 flex justify-between items-center"><h3 class="font-black">${title}</h3><button onclick="aib.close('${id}')" class="text-2xl leading-none">×</button></div><div class="p-5">${body}</div></div></div>`;
 
   // ================= হেডারে নতুন অ্যাকশন বার (ক্যাটাগরি বারের ঠিক নিচে) =================
   const nav = [["fa-store", "আমার স্টোর", "aib.openStore()"], ["fa-plus", "পণ্য যোগ (বিক্রি)", "aib.openProd('sell')"], ["fa-cart-plus", "কিনতে চাই (ক্রয় রিকোয়েস্ট)", "aib.openProd('buy')"],
@@ -235,7 +235,15 @@
   const oldSearch = window.searchProducts;
   window.searchProducts = (q) => { searchQ = q; oldSearch(q); };
   const oldMode = window.switchMarketMode;
-  window.switchMarketMode = (m) => { oldMode(m); applyCat(catFilter, false); };
+  const mkt = () => (typeof currentMarketMode !== "undefined" ? currentMarketMode : "b2b");
+  const modeCls = (on) => "px-3 py-1.5 rounded-md " + (on ? "bg-brandRed text-white shadow" : "text-gray-600 hover:text-gray-900");
+  $("modeB2C").insertAdjacentHTML("afterend", `<button id="modeBuyer" onclick="switchMarketMode('buyer')" class="${modeCls(false)}">ক্রেতা (Buyer)</button>`);
+  window.switchMarketMode = (m) => {
+    oldMode(m);
+    [["b2b", "modeB2B"], ["b2c", "modeB2C"], ["buyer", "modeBuyer"]].forEach(([k, id]) => { const el = $(id); if (el) el.className = modeCls(k === m); });
+    applyCat(catFilter, false);
+    const t = $("sectionTitle"); if (t && m === "buyer" && catFilter === "all") t.innerText = "🛍️ ক্রেতা মোড — কেনার জন্য পণ্যসমূহ";
+  };
 
   // লগইন/প্রোফাইল: আগের হেডার বাটনই ব্যবহার হবে (লগইন না থাকলে সাইন-ইন, থাকলে প্রোফাইল পপআপ)
   window.openAuthModal = () => { if (me) return aib.openProfile(); aib.open("aibAuth"); aib.tab(mode); };
@@ -252,7 +260,7 @@
   // ================= ইউজার পণ্য =================
   function userList() {
     const q = searchQ.toLowerCase().trim(), d = distFilter !== "all" ? DISTRICTS_DATA.find((x) => x.id === distFilter) : null;
-    return P.filter((p) => (catFilter === "all" || p.category === catFilter) && (!d || String(p.district || "").includes(d.name)) &&
+    return P.filter((p) => (catFilter === "all" || p.category === catFilter) && (mkt() !== "buyer" || (p.kind === "sell" && p.price)) && (!d || String(p.district || "").includes(d.name)) &&
       (!q || [p.title, p.district, p.description, p.owner_name].join(" ").toLowerCase().includes(q)));
   }
   function card(p) {
@@ -347,6 +355,7 @@
   const STATUS = { pending: "⏳ অপেক্ষমাণ", confirmed: "✅ নিশ্চিত", shipped: "🚚 পাঠানো হয়েছে", delivered: "📦 ডেলিভারি সম্পন্ন", cancelled: "❌ বাতিল" };
   let cart = [], cur = null, curQty = 1;
   try { cart = JSON.parse(localStorage.getItem("aib_cart") || "[]"); } catch (e) {}
+  cart.forEach((c) => (c.min = 1));
   const updateBadge = () => { const b = $("cartCount"); if (b) b.innerText = cart.length; };
   const saveCart = () => { try { localStorage.setItem("aib_cart", JSON.stringify(cart)); } catch (e) {} updateBadge(); };
   const cartTotal = () => cart.reduce((a, c) => a + c.price * c.qty, 0);
@@ -354,8 +363,8 @@
   let toastT; const toast = (m) => { const t = $("aibToast"); t.innerText = m; t.classList.remove("hidden"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), 2200); };
 
   document.body.insertAdjacentHTML("beforeend",
-    modal("aibItem", "পণ্যের বিস্তারিত", `<div id="itemBody"></div>`) +
-    modal("aibCart", "🛒 আমার কার্ট", `<div id="cartBody"></div>`) +
+    modal("aibItem", "পণ্যের বিস্তারিত", `<div id="itemBody"></div>`, true) +
+    modal("aibCart", "🛒 আমার কার্ট", `<div id="cartBody"></div>`, true) +
     modal("aibCheckout", "অর্ডার ও পেমেন্ট", `<form onsubmit="aib.place(event)" class="space-y-2 text-sm">
       <div id="coSum" class="bg-gray-50 border rounded-xl p-3 text-xs space-y-1"></div>
       <div><label class="${lbl}">প্রাপকের নাম *</label><input id="coName" required class="${inp}"></div>
@@ -368,7 +377,7 @@
       <div id="coTrxW" class="hidden"><label class="${lbl}">Transaction ID (TrxID) *</label><input id="coTrx" class="${inp}"></div>
       <button class="w-full bg-brandRed text-white rounded-lg font-bold py-3">অর্ডার নিশ্চিত করুন</button>
      </form>`) +
-    modal("aibOrders", "📦 আমার অর্ডার", `<div id="ordBody" class="space-y-2"></div>`) +
+    modal("aibOrders", "📦 আমার অর্ডার", `<div id="ordBody" class="space-y-3"></div>`, true) +
     `<div id="aibToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-brandDark text-white text-sm px-4 py-2 rounded-full shadow-lg z-[70] hidden"></div>`);
 
   // আসল জেলা-কার্ডে "কিনুন" ও "কার্টে যোগ" বাটন
@@ -385,7 +394,7 @@
     if (src === "d") {
       const d = DISTRICTS_DATA.find((x) => x.id === id); if (!d) return null;
       const b2b = typeof currentMarketMode !== "undefined" && currentMarketMode === "b2b";
-      return { key: "d:" + id, src, id, title: d.famous, sub: `${d.name}, ${d.division}`, price: 250, min: b2b ? 20 : 1, unit: "ইউনিট", seller: `${d.name} সাপ্লাই পয়েন্ট`, owner: null, gi: d.gi,
+      return { key: "d:" + id, src, id, title: d.famous, sub: `${d.name}, ${d.division}`, price: 250, min: 1, unit: "ইউনিট", seller: `${d.name} সাপ্লাই পয়েন্ট`, owner: null, gi: d.gi,
         desc: `${d.name} জেলার আসল ও খাঁটি স্থানীয় পণ্য, সরাসরি উৎস থেকে সরবরাহ।`, stock: b2b ? "বাল্ক: ১০০ কেজি / ২০ পিস" : "" };
     }
     const p = P.find((x) => x.id === +id); if (!p) return null;
@@ -393,11 +402,11 @@
     return { key: "p:" + p.id, src, id: p.id, title: p.title, sub: `${p.district || ""} · ${CATS[p.category] || ""}`, price: p.price ? +p.price : null, min: 1, unit: "ইউনিট",
       seller: p.owner_name, owner: p.owner, verified: ow.verified, desc: p.description, stock: p.qty };
   }
-  function addToCart(it, qty) {
+  function addToCart(it, qty, show = true) {
     if (me && it.owner && it.owner === me.id) return alert("নিজের পণ্য নিজে কেনা যাবে না");
     const ex = cart.find((c) => c.key === it.key);
-    if (ex) ex.qty += qty; else cart.push({ key: it.key, title: it.title, price: it.price, min: it.min, seller: it.seller, owner: it.owner, qty });
-    saveCart(); toast("🛒 কার্টে যোগ হয়েছে");
+    if (ex) ex.qty += qty; else cart.push({ key: it.key, src: it.src, title: it.title, sub: it.sub, gi: it.gi, verified: it.verified, stock: it.stock, price: it.price, min: 1, seller: it.seller, owner: it.owner, qty });
+    saveCart(); toast("🛒 কার্টে যোগ হয়েছে"); if (show) { renderCart(); aib.open("aibCart"); }
   }
   function showItem(it) { cur = it; curQty = it.min; renderItem(); aib.open("aibItem"); }
   function setQty(v) { curQty = Math.max(cur.min, v); $("iq").value = curQty; $("itot").innerText = cur.price ? "৳ " + cur.price * curQty : ""; }
@@ -427,26 +436,51 @@
     </div>`;
   }
   function renderCart() {
-    $("cartBody").innerHTML = cart.length ? `<div class="space-y-2 text-sm">${cart.map((c) => `<div class="border rounded-lg p-3 space-y-1">
-      <div class="flex justify-between gap-2"><b>${esc(c.title)}</b><button onclick="aib.cr('${c.key}')" class="text-red-600 text-xs font-bold">মুছুন</button></div>
-      <div class="text-xs text-gray-500">বিক্রেতা: ${esc(c.seller)} · ৳ ${c.price}/ইউনিট</div>
-      <div class="flex items-center gap-2"><button onclick="aib.cq('${c.key}',-1)" class="w-7 h-7 rounded bg-gray-200 font-black">−</button><b>${c.qty}</b><button onclick="aib.cq('${c.key}',1)" class="w-7 h-7 rounded bg-gray-200 font-black">+</button><span class="ml-auto font-black text-brandRed">৳ ${c.price * c.qty}</span></div></div>`).join("")}
-      <div class="flex justify-between text-lg font-black pt-2 border-t"><span>সর্বমোট</span><span>৳ ${cartTotal()}</span></div>
-      <button onclick="aib.openCheckout()" class="w-full bg-brandRed text-white rounded-lg font-bold py-3">অর্ডার ও পেমেন্টে যান</button></div>`
-      : `<p class="text-sm text-gray-500">কার্ট খালি। পণ্যের কার্ডে "কার্টে যোগ করুন" চাপুন।</p>`;
+    const n = cart.reduce((a, c) => a + c.qty, 0);
+    $("cartBody").innerHTML = cart.length ? `<div class="space-y-4">
+      <div class="text-sm text-gray-600">আপনার কার্টে <b>${cart.length}</b> টি পণ্য (মোট <b>${n}</b> ইউনিট) আছে</div>
+      ${cart.map((c) => `<div class="border-2 border-gray-200 rounded-2xl p-4 flex gap-4">
+        <div class="hidden sm:flex w-24 h-24 shrink-0 rounded-xl bg-gradient-to-br from-brandDark to-gray-700 items-center justify-center text-white text-4xl"><i class="fa-solid fa-basket-shopping"></i></div>
+        <div class="flex-1 space-y-2">
+          <div class="flex justify-between gap-2"><h4 class="text-base font-black text-gray-900">${esc(c.title)} ${c.gi ? `<span class="text-[10px] bg-brandGold px-2 py-0.5 rounded font-black">GI</span>` : ""}</h4><button onclick="aib.cr('${c.key}')" class="text-red-600 text-sm font-bold whitespace-nowrap">🗑️ মুছুন</button></div>
+          <div class="text-sm text-gray-500">📍 ${esc(c.sub || "")}</div>
+          <div class="text-sm">🏪 বিক্রেতা: <b>${esc(c.seller)}</b> ${c.src === "p" ? badge(c.verified) : ""}</div>
+          ${c.stock ? `<div class="text-sm text-gray-500">মজুদ/পরিমাণ: ${esc(c.stock)}</div>` : ""}
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <span class="text-sm">দর: <b class="text-brandRed">৳ ${c.price}</b> / ইউনিট</span>
+            <div class="flex items-center gap-2"><button onclick="aib.cq('${c.key}',-1)" class="w-9 h-9 rounded-lg bg-gray-200 text-lg font-black">−</button><b class="text-lg w-10 text-center">${c.qty}</b><button onclick="aib.cq('${c.key}',1)" class="w-9 h-9 rounded-lg bg-gray-200 text-lg font-black">+</button></div>
+            <span class="ml-auto text-xl font-black text-brandRed">৳ ${c.price * c.qty}</span>
+          </div></div></div>`).join("")}
+      <div class="bg-gray-50 border rounded-2xl p-4 space-y-1 text-sm">
+        <div class="flex justify-between"><span>পণ্যের মোট দাম</span><b>৳ ${cartTotal()}</b></div>
+        <div class="flex justify-between text-gray-500"><span>ডেলিভারি চার্জ</span><span>বিক্রেতার সাথে ঠিক হবে</span></div>
+        <div class="flex justify-between text-xl font-black pt-2 border-t"><span>সর্বমোট</span><span class="text-brandRed">৳ ${cartTotal()}</span></div>
+      </div>
+      <div class="flex gap-2"><button onclick="aib.close('aibCart')" class="flex-1 py-3 bg-gray-200 rounded-xl font-bold">+ আরো পণ্য দেখুন</button><button onclick="aib.openCheckout()" class="flex-1 py-3 bg-brandRed text-white rounded-xl font-bold">অর্ডার ও পেমেন্টে যান →</button></div></div>`
+      : `<p class="text-base text-gray-500 py-6 text-center">🛒 কার্ট খালি। পণ্যের কার্ডে "কার্টে যোগ করুন" চাপুন।</p>`;
   }
   async function loadOrders() {
-    const { data, error } = await db.from("orders").select("*").order("created_at", { ascending: false }).limit(100);
+    const { data, error } = await db.from("orders").select("*").order("created_at", { ascending: false }).limit(200);
     if (error) { $("ordBody").innerHTML = `<p class="text-red-600 text-sm">${esc(error.message)}</p>`; return; }
-    const mine = data.filter((o) => o.buyer === me.id), inc = data.filter((o) => o.seller === me.id);
-    const line = (o, sel) => `<div class="border rounded-lg p-3 text-xs space-y-1"><div class="flex justify-between gap-2"><b class="text-sm">${esc(o.item_title)}</b><span class="font-bold whitespace-nowrap">${STATUS[o.status] || o.status}</span></div>
-      <div>${o.qty} × ৳${o.unit_price} = <b>৳${o.total}</b></div>
-      <div>পেমেন্ট: ${esc(PAY[o.payment_method]?.n || o.payment_method)}${o.trx_id ? " · TrxID: " + esc(o.trx_id) : ""} · ${o.pay_status === "paid" ? "✅ পরিশোধিত" : "⏳ যাচাই বাকি"}</div>
-      ${sel ? `<div>ক্রেতা: ${esc(o.buyer_name)} · 📞 ${esc(o.buyer_phone)}<br>📍 ${esc(o.address)}${o.note ? " · " + esc(o.note) : ""}</div>
-       <div class="flex flex-wrap gap-1 pt-1 font-bold">${["confirmed", "shipped", "delivered", "cancelled"].map((s) => `<button onclick="aib.setSt(${o.id},'${s}')" class="px-2 py-1 bg-gray-100 rounded">${STATUS[s]}</button>`).join("")}<button onclick="aib.setPaid(${o.id})" class="px-2 py-1 bg-green-100 text-green-700 rounded">💰 পেমেন্ট পেয়েছি</button></div>`
-        : `<div>বিক্রেতা: ${esc(o.seller_name)}</div>`}</div>`;
-    $("ordBody").innerHTML = `<div class="font-bold text-sm">🛍️ আমার কেনা (${mine.length})</div>${mine.map((o) => line(o, false)).join("") || `<p class="text-xs text-gray-500">এখনো কিছু কেনেননি</p>`}
-      <div class="font-bold text-sm pt-3">📥 আমার কাছে আসা অর্ডার (${inc.length})</div>${inc.map((o) => line(o, true)).join("") || `<p class="text-xs text-gray-500">কোনো অর্ডার আসেনি</p>`}`;
+    const grp = (list) => { const m = {}; list.forEach((o) => (m[o.group_id || o.id] ||= []).push(o)); return Object.values(m); };
+    const mine = grp(data.filter((o) => o.buyer === me.id)), inc = grp(data.filter((o) => o.seller === me.id));
+    const steps = ["pending", "confirmed", "shipped", "delivered"];
+    const track = (s) => s === "cancelled" ? `<div class="text-sm font-bold text-red-600">❌ অর্ডার বাতিল</div>` :
+      `<div class="flex flex-wrap items-center gap-1 text-xs font-bold">${steps.map((x, i) => `<span class="px-2 py-1 rounded-full ${i <= steps.indexOf(s) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}">${STATUS[x]}</span>`).join('<span class="text-gray-300">›</span>')}</div>`;
+    const box = (g, sel) => {
+      const f = g[0], tot = g.reduce((a, o) => a + +o.total, 0), dt = new Date(f.created_at).toLocaleString("bn-BD");
+      return `<div class="border-2 rounded-2xl p-4 space-y-3">
+       <div class="flex flex-wrap justify-between gap-2"><div><b class="text-base">অর্ডার # ${esc(f.group_id || f.id)}</b><div class="text-xs text-gray-500">🕒 ${esc(dt)}</div></div><div class="text-xl font-black text-brandRed">৳ ${tot}</div></div>
+       ${g.map((o) => `<div class="bg-gray-50 border rounded-xl p-3 space-y-2 text-sm">
+         <div class="flex flex-wrap justify-between gap-2"><b class="text-base">${esc(o.item_title)}</b><b>${o.qty} × ৳${o.unit_price} = ৳${o.total}</b></div>
+         ${sel ? "" : `<div>🏪 বিক্রেতা: <b>${esc(o.seller_name)}</b>${U[o.seller]?.phone ? " · 📞 " + esc(U[o.seller].phone) : ""}</div>`}
+         <div>💳 ${esc(PAY[o.payment_method]?.n || o.payment_method)}${o.trx_id ? " · TrxID: <b>" + esc(o.trx_id) + "</b>" : ""} · ${o.pay_status === "paid" ? "<b class='text-green-700'>✅ পরিশোধিত</b>" : "<b class='text-yellow-700'>⏳ পেমেন্ট যাচাই বাকি</b>"}</div>
+         ${track(o.status)}
+         ${sel ? `<div class="flex flex-wrap gap-2 pt-1 font-bold text-xs">${["confirmed", "shipped", "delivered", "cancelled"].map((s) => `<button onclick="aib.setSt(${o.id},'${s}')" class="px-3 py-1.5 bg-gray-200 rounded-lg">${STATUS[s]}</button>`).join("")}<button onclick="aib.setPaid(${o.id})" class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg">💰 পেমেন্ট পেয়েছি</button></div>` : ""}</div>`).join("")}
+       <div class="text-sm space-y-0.5"><div>👤 ${sel ? "ক্রেতা" : "প্রাপক"}: <b>${esc(f.buyer_name)}</b> · 📞 ${esc(f.buyer_phone)}</div><div>📍 ঠিকানা: ${esc(f.address)}</div>${f.note ? `<div>📝 নির্দেশনা: ${esc(f.note)}</div>` : ""}</div></div>`;
+    };
+    $("ordBody").innerHTML = `<div class="font-black text-base">🛍️ আমার কেনা অর্ডার (${mine.length})</div>${mine.map((g) => box(g, false)).join("") || `<p class="text-sm text-gray-500">এখনো কিছু কেনেননি</p>`}
+      <div class="font-black text-base pt-4">📥 আমার কাছে আসা অর্ডার (${inc.length})</div>${inc.map((g) => box(g, true)).join("") || `<p class="text-sm text-gray-500">কোনো অর্ডার আসেনি</p>`}`;
   }
 
   Object.assign(aib, {
@@ -455,7 +489,7 @@
     addD(id) { aib.guard(() => { const it = mkItem("d", id); if (it) addToCart(it, it.min); }); },
     addP(id) { aib.guard(() => { const it = mkItem("p", id); if (!it) return; if (!it.price) return showItem(it); addToCart(it, it.min); }); },
     q(d) { setQty(curQty + d); }, qset(v) { setQty(parseInt(v, 10) || cur.min); },
-    addCur(go) { aib.guard(() => { if (me && cur.owner === me.id) return alert("নিজের পণ্য নিজে কেনা যাবে না"); addToCart(cur, curQty); aib.close("aibItem"); if (go) aib.openCheckout(); }); },
+    addCur(go) { aib.guard(() => { if (me && cur.owner === me.id) return alert("নিজের পণ্য নিজে কেনা যাবে না"); aib.close("aibItem"); addToCart(cur, curQty, !go); if (go) aib.openCheckout(); }); },
     openCart() { aib.guard(() => { renderCart(); aib.open("aibCart"); }); },
     cq(k, d) { const c = cart.find((x) => x.key === k); if (!c) return; c.qty = Math.max(c.min, c.qty + d); saveCart(); renderCart(); },
     cr(k) { cart = cart.filter((x) => x.key !== k); saveCart(); renderCart(); },
