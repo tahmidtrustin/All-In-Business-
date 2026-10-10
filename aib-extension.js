@@ -356,7 +356,7 @@
   let cart = [], cur = null, curQty = 1;
   try { cart = JSON.parse(localStorage.getItem("aib_cart") || "[]"); } catch (e) {}
   cart.forEach((c) => (c.min = 1));
-  const updateBadge = () => { const b = $("cartCount"); if (b) b.innerText = cart.length; };
+  const updateBadge = () => { ["cartCount", "bnCart"].forEach((i) => { const b = $(i); if (b) b.innerText = cart.length; }); };
   const saveCart = () => { try { localStorage.setItem("aib_cart", JSON.stringify(cart)); } catch (e) {} updateBadge(); };
   const cartTotal = () => cart.reduce((a, c) => a + c.price * c.qty, 0);
   window.updateCartBadge = updateBadge;
@@ -465,8 +465,15 @@
     const grp = (list) => { const m = {}; list.forEach((o) => (m[o.group_id || o.id] ||= []).push(o)); return Object.values(m); };
     const mine = grp(data.filter((o) => o.buyer === me.id)), inc = grp(data.filter((o) => o.seller === me.id));
     const steps = ["pending", "confirmed", "shipped", "delivered"];
-    const track = (s) => s === "cancelled" ? `<div class="text-sm font-bold text-red-600">❌ অর্ডার বাতিল</div>` :
-      `<div class="flex flex-wrap items-center gap-1 text-xs font-bold">${steps.map((x, i) => `<span class="px-2 py-1 rounded-full ${i <= steps.indexOf(s) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}">${STATUS[x]}</span>`).join('<span class="text-gray-300">›</span>')}</div>`;
+    const track = (s) => {
+      if (s === "cancelled") return `<div class="text-sm font-bold text-red-600">❌ অর্ডার বাতিল</div>`;
+      const T = { pending: "অপেক্ষমাণ", confirmed: "নিশ্চিত", shipped: "পাঠানো হয়েছে", delivered: "ডেলিভারি সম্পন্ন" }, cu = steps.indexOf(s);
+      const chips = steps.map((x, i) => i < cu
+        ? (x === "pending" ? `<span class="px-2 py-1 rounded-full bg-gray-100 text-gray-400 line-through">❌ ${T[x]}</span>` : `<span class="px-2 py-1 rounded-full bg-green-50 text-green-600">✔ ${T[x]}</span>`)
+        : i === cu ? `<span class="px-2 py-1 rounded-full bg-green-600 text-white ring-2 ring-green-200">${STATUS[x]}</span>`
+        : `<span class="px-2 py-1 rounded-full bg-gray-100 text-gray-400">${T[x]}</span>`).join('<span class="text-gray-300">›</span>');
+      return `<div class="flex flex-wrap items-center gap-1 text-xs font-bold">${chips}</div>${s === "delivered" ? `<div class="text-sm font-bold text-green-700">✅ পণ্য ডেলিভারি সম্পন্ন হয়েছে</div>` : ""}`;
+    };
     const box = (g, sel) => {
       const f = g[0], tot = g.reduce((a, o) => a + +o.total, 0), dt = new Date(f.created_at).toLocaleString("bn-BD");
       return `<div class="border-2 rounded-2xl p-4 space-y-3">
@@ -522,6 +529,46 @@
     async setSt(id, s) { const { error } = await db.from("orders").update({ status: s }).eq("id", id); if (error) alert(error.message); loadOrders(); },
     async setPaid(id) { const { error } = await db.from("orders").update({ pay_status: "paid" }).eq("id", id); if (error) alert(error.message); loadOrders(); },
   });
+  updateBadge();
+
+  // ================= মোবাইল ভিউ =================
+  document.head.insertAdjacentHTML("beforeend", `<style>
+   @media (max-width: 768px) {
+    body { padding-bottom: 72px; }
+    body > div.bg-brandDark.text-xs { flex-direction: column; gap: 4px; text-align: center; padding: 6px 8px; }
+    header { position: static !important; }
+    header > .max-w-7xl { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    header > .max-w-7xl > div:nth-child(1) { order: 1; }
+    header > .max-w-7xl > div:nth-child(2) { order: 3; flex: 0 0 100%; max-width: 100%; margin: 0; }
+    header > .max-w-7xl > div:nth-child(3) { order: 2; margin-left: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    header > .max-w-7xl > div:nth-child(3) > * { margin-left: 0 !important; }
+    header h1 { font-size: 1.1rem; }
+    header .max-w-7xl p.text-xs { font-size: 10px; }
+    header select#searchDistrictSelect { max-width: 105px; padding: 8px 6px; }
+    header input#searchInput { min-width: 0; }
+    #navUserName { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+    #userProfileBtn { padding: 8px 10px; }
+    header .overflow-x-auto { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    header .overflow-x-auto::-webkit-scrollbar { display: none; }
+    section, #aibChatMap { scroll-margin-top: 10px !important; }
+    main { padding-left: 12px; padding-right: 12px; }
+    main section h2.text-3xl { font-size: 1.5rem; }
+    main section .flex.justify-between.items-center { flex-wrap: wrap; gap: 6px; }
+    #map { height: 300px !important; }
+    #chatBox { height: 260px; }
+    #aibToast { bottom: 84px !important; max-width: 90vw; text-align: center; }
+    footer .max-w-7xl { padding-left: 16px; padding-right: 16px; }
+   }
+  </style>`);
+  document.body.insertAdjacentHTML("beforeend", `
+  <div id="aibBottomNav" class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-brandDark text-white flex justify-around text-[11px] border-t border-gray-700">
+   <button onclick="window.scrollTo({top:0,behavior:'smooth'})" class="flex-1 py-2 flex flex-col items-center gap-0.5"><i class="fa-solid fa-house text-base"></i>হোম</button>
+   <button onclick="aib.openProd('sell')" class="flex-1 py-2 flex flex-col items-center gap-0.5"><i class="fa-solid fa-circle-plus text-base"></i>পণ্য যোগ</button>
+   <button onclick="aib.openCart()" class="flex-1 py-2 flex flex-col items-center gap-0.5 relative"><i class="fa-solid fa-cart-shopping text-base"></i>কার্ট<span id="bnCart" class="absolute top-0.5 right-3 bg-brandRed text-[10px] min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center font-bold">0</span></button>
+   <button onclick="aib.openOrders()" class="flex-1 py-2 flex flex-col items-center gap-0.5"><i class="fa-solid fa-box text-base"></i>অর্ডার</button>
+   <button onclick="aib.goChat()" class="flex-1 py-2 flex flex-col items-center gap-0.5"><i class="fa-solid fa-comments text-base"></i>চ্যাট</button>
+   <button onclick="openAuthModal()" class="flex-1 py-2 flex flex-col items-center gap-0.5"><i class="fa-solid fa-user text-base"></i>প্রোফাইল</button>
+  </div>`);
   updateBadge();
 
   // ================= শুরু =================
